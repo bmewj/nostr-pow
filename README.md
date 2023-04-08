@@ -45,3 +45,6 @@ directly return the resulting event.
 
 `nostr-pow` computes the hashes on the CPU using the maximum amount of hardware threads
 available. See [`compute_nonce.c`](src/compute_nonce.c) for the main computation function.
+
+On a Mac mini (2018) 3.2 GHz 6-Core Intel Core i7 `nostr-pow` computes roughly 10 million
+hashes per second.
