@@ -1,6 +1,9 @@
 #include <string.h>
+#include <stdio.h>
 #include <assert.h>
 #include "sha256.h"
+
+#define NONCE_MAX_LEN 32
 
 /**
  * 
@@ -35,11 +38,6 @@ long compute_nonce(const char* prefix_str, const char* suffix_str, int target_di
 
     size_t suffix_len = strlen(suffix_str);
 
-    int num_digits = 1;
-    long next_digit = 10;
-    char buffer[32];
-    unsigned char hash[32];
-
     // Prepare difficulty mask
     assert(target_difficulty <= 64);
     unsigned long difficulty_mask = 0;
@@ -61,35 +59,54 @@ long compute_nonce(const char* prefix_str, const char* suffix_str, int target_di
         }
     }
 
+    // Prepare nonce string
     long nonce = start;
+    char nonce_str[NONCE_MAX_LEN + 1];
+    char* nonce_end = nonce_str + NONCE_MAX_LEN;
+    int nonce_digits;
+    {
+        memset(nonce_str, '0', NONCE_MAX_LEN);
+        nonce_str[NONCE_MAX_LEN] = '\0';
+
+        char start_str[32];
+        sprintf(start_str, "%d", start);
+        nonce_digits = (int)strlen(start_str);
+        strncpy(nonce_end - nonce_digits, start_str, nonce_digits);
+    }
+
     long i = 0;
     while ((++i % 1000) != 0 || *interrupt == 0) {
 
-        // Convert the nonce to a string
-        {
-            while (nonce >= next_digit) {
-                num_digits++;
-                next_digit *= 10;
-            }
-            long rem = nonce;
-            buffer[num_digits] = '\0';
-            for (int digit = 0; digit < num_digits; ++digit) {
-                buffer[num_digits - 1 - digit] = '0' + (rem % 10);
-                rem /= 10;
-            }
-        }
-
         // Make a copy of our SHA256 ctx
         SHA256_CTX ctx_copy = ctx;
-        sha256_update(&ctx_copy, (unsigned char*)buffer, num_digits);
+        sha256_update(&ctx_copy, (unsigned char*)(nonce_end - nonce_digits), nonce_digits);
         sha256_update(&ctx_copy, (const unsigned char*)suffix_str, suffix_len);
-        sha256_final(&ctx_copy, hash);
 
+        unsigned char hash[32];
+        sha256_final(&ctx_copy, hash);
         if ((*(unsigned long*)hash & difficulty_mask) == 0) {
             break;
         }
 
+        // Update nonce string
         nonce += step;
+        int inc = step;
+        char* ptr = nonce_end - 1;
+        while (1) {
+            *ptr += inc;
+            if (*ptr <= '9') {
+                break;
+            }
+
+            // Overflow
+            int rem = (*ptr - '0') % 10;
+            inc = (*ptr - '0') / 10;
+            *ptr = rem + '0';
+            --ptr;
+        }
+        if (nonce_digits < (int)(nonce_end - ptr)) {
+            nonce_digits = (int)(nonce_end - ptr);
+        }
     }
     
     return nonce;

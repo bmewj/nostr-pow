@@ -1,6 +1,6 @@
 {
   "name": "nostr-pow",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "Fast proof-of-work nonce generator for Nostr events",
   "keywords": [
     "sha256",
